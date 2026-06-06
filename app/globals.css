@@ -1,26 +1,100 @@
-@import "tailwindcss";
+@font-face {
+  font-family: "OSRS UI";
+  src: url("/osrs-ui.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OSRS UI";
+  src: url("/osrs-ui-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  --bg: #1a1410;
+  --bg-2: #221c15;
+  --panel: #221c15;
+  --panel-2: #2a2219;
+  --panel-hover: #31271d;
+  --border: #3d3020;
+  --border-light: #4a3c28;
+  --text: #f0e8c8;
+  --muted: #b7a37a;
+  --danger: #8b3a3a;
+  --success: #7b8f57;
+  --warning: #c89b3c;
+  --gold: #c89b3c;
+  --gold-light: #e8c96a;
+  --silver: #b8b1a3;
+  --bronze: #9a6130;
+  --shadow: 0 8px 18px rgba(0, 0, 0, 0.38);
+  --inset-border: inset 0 0 0 1px rgba(240, 232, 200, 0.03);
+  --heading-font: "OSRS UI", serif;
+  --display-font: "OSRS UI", sans-serif;
+  --body-font: "OSRS UI", sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  min-height: 100%;
+  background:
+    linear-gradient(180deg, #2a2219 0, rgba(42, 34, 25, 0) 180px),
+    linear-gradient(180deg, #1a1410 0%, #17110d 100%);
+  color: var(--text);
+  font-family: var(--body-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--heading-font);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* Custom Scrollbars to match OSRS interface */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #17110d;
+  border-left: 1px solid var(--border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border: 1px solid #1a1410;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold);
 }
