@@ -92,7 +92,9 @@ The production server will run on `0.0.0.0:3000`.
 
 ## License
 
-Private repository. All rights reserved.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+You are free to use, modify, and distribute this software under the terms of the MIT License. This makes the project open-source and available for anyone to use.
 
 ## Support
 
