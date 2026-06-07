@@ -1359,9 +1359,13 @@ export function FightBrowser({
 
   useEffect(() => {
     const player = selectedPlayer;
-    if (!player || selectedFightId) {
+    if (!player) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlayerStats(null);
+      return;
+    }
+
+    if (selectedFightId) {
       return;
     }
 
