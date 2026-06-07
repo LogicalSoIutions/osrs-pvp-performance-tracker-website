@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start --hostname 0.0.0.0",
+    "start": "next start -p 15650",
     "lint": "eslint",
     "upload:legacy": "node scripts/upload-legacy-fights.mjs"
   },
