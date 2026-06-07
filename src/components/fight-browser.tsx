@@ -1293,14 +1293,14 @@ export function FightBrowser({
   const [selectedLogIndex, setSelectedLogIndex] = useState(0);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [globalStats, setGlobalStats] = useState<DashboardStats | null>(null);
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsLoadingCount, setStatsLoadingCount] = useState(0);
 
   const selectedPlayerRef = useRef(selectedPlayer);
   const selectedFightIdRef = useRef(selectedFightId);
   const hasLoadedPlayersRef = useRef(false);
+  const statsLoading = statsLoadingCount > 0;
 
   useEffect(() => {
     selectedPlayerRef.current = selectedPlayer;
@@ -1332,15 +1332,13 @@ export function FightBrowser({
     if (selectedPlayer || selectedFightId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setGlobalStats(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStatsLoading(false);
       return;
     }
 
     let cancelled = false;
     async function fetchStats() {
+      setStatsLoadingCount((count) => count + 1);
       try {
-        setStatsLoading(true);
         const response = await fetch("/api/stats");
         if (response.ok && !cancelled) {
           const data = await response.json();
@@ -1349,9 +1347,7 @@ export function FightBrowser({
       } catch (err) {
         console.error("Failed to load global stats:", err);
       } finally {
-        if (!cancelled) {
-          setStatsLoading(false);
-        }
+        setStatsLoadingCount((count) => Math.max(0, count - 1));
       }
     }
 
@@ -1366,16 +1362,14 @@ export function FightBrowser({
     if (!player || selectedFightId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlayerStats(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStatsLoading(false);
       return;
     }
 
     let cancelled = false;
     async function fetchPStats() {
       if (!player) return;
+      setStatsLoadingCount((count) => count + 1);
       try {
-        setStatsLoading(true);
         const response = await fetch(`/api/players/${encodeURIComponent(player)}/stats`);
         if (response.ok && !cancelled) {
           const data = await response.json();
@@ -1384,9 +1378,7 @@ export function FightBrowser({
       } catch (err) {
         console.error("Failed to load player stats:", err);
       } finally {
-        if (!cancelled) {
-          setStatsLoading(false);
-        }
+        setStatsLoadingCount((count) => Math.max(0, count - 1));
       }
     }
 
@@ -1444,17 +1436,12 @@ export function FightBrowser({
       }
 
       try {
-        setLoading(true);
         setError("");
         await loadPlayers("");
         hasLoadedPlayersRef.current = true;
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : "Unknown error");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
         }
       }
     }
@@ -1485,22 +1472,15 @@ export function FightBrowser({
     if (!nextPlayer) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlayerFights([]);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
       return;
     }
 
     async function syncPlayerRoute(playerName: string) {
       try {
-        setLoading(true);
         await loadPlayerFights(playerName);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : "Unknown error");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
         }
       }
     }
@@ -1524,8 +1504,6 @@ export function FightBrowser({
     if (!nextFightId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedFight(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
       return;
     }
 
@@ -1535,16 +1513,11 @@ export function FightBrowser({
 
     async function syncFightRoute(fightId: string) {
       try {
-        setLoading(true);
         setError("");
         await loadFight(fightId);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : "Unknown error");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
         }
       }
     }
@@ -1658,7 +1631,6 @@ export function FightBrowser({
   }
 
   function handlePlayerClick(playerName: string) {
-    setLoading(true);
     setSelectedPlayer(playerName);
     setSelectedFightId(null);
     setSelectedFight(null);
@@ -1671,13 +1643,11 @@ export function FightBrowser({
     const playerName = selectedPlayer ?? fight.competitor_name;
     setSelectedFightId(fight.fight_id);
     setSelectedLogIndex(0);
-    setLoading(true);
     setError("");
     updateRoute(playerName, fight.fight_id);
   }
 
   function handleBack() {
-    setLoading(true);
     setSelectedPlayer(null);
     setSelectedFightId(null);
     setSelectedFight(null);
@@ -1779,13 +1749,13 @@ export function FightBrowser({
               <PlayerDashboard
                 key={selectedPlayer}
                 stats={playerStats}
-                loading={loading || statsLoading}
+                loading={statsLoading}
                 onPlayerClick={handlePlayerClick}
               />
             ) : (
               <HomeDashboard
                 stats={globalStats}
-                loading={loading || statsLoading}
+                loading={statsLoading}
                 onPlayerClick={handlePlayerClick}
                 onFightClick={handleFightClick}
               />
