@@ -242,6 +242,7 @@ function mergeFighterFromLogs(
     const recalculated = recalculateMergedEntry(fight, attackLog, defenderLog, itemStatsById);
     return {
       ...attackLog,
+      g: defenderLog.G ?? attackLog.g,
       d: recalculated.expectedDamage,
       a: recalculated.accuracy,
       l: recalculated.minHit,

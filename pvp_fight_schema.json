@@ -1,0 +1,285 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PvpFightPerformanceList",
+  "description": "Serialized FightPerformance records emitted by the RuneLite plugin source.",
+  "type": "array",
+  "items": {
+    "$ref": "#/definitions/FightPerformance"
+  },
+  "definitions": {
+    "FightPerformance": {
+      "type": "object",
+      "properties": {
+        "c": {
+          "$ref": "#/definitions/Fighter",
+          "description": "Serialized FightPerformance.competitor."
+        },
+        "o": {
+          "$ref": "#/definitions/Fighter",
+          "description": "Serialized FightPerformance.opponent."
+        },
+        "t": {
+          "type": "integer",
+          "description": "FightPerformance.lastFightTime as epoch milliseconds."
+        },
+        "fightID": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{10}$",
+          "description": "Plugin-generated 10 character encounter identifier used to pair POVs."
+        },
+        "l": {
+          "type": "string",
+          "enum": ["LMS_MAXMED", "LMS_ZERK", "LMS_1DEF", "NORMAL"],
+          "description": "FightPerformance.fightType."
+        },
+        "w": {
+          "type": "integer",
+          "description": "FightPerformance.world."
+        }
+      },
+      "required": ["c", "o", "t", "fightID", "l", "w"],
+      "additionalProperties": false
+    },
+    "Fighter": {
+      "type": "object",
+      "properties": {
+        "n": {
+          "type": "string",
+          "description": "Fighter.name."
+        },
+        "a": {
+          "type": "integer",
+          "description": "Fighter.attackCount."
+        },
+        "s": {
+          "type": "integer",
+          "description": "Fighter.offPraySuccessCount."
+        },
+        "d": {
+          "type": "number",
+          "description": "Fighter.expectedDamage."
+        },
+        "h": {
+          "type": "integer",
+          "description": "Fighter.damageDealt."
+        },
+        "z": {
+          "type": "integer",
+          "description": "Fighter.totalMagicAttackCount."
+        },
+        "m": {
+          "type": "integer",
+          "description": "Fighter.magicHitCount."
+        },
+        "M": {
+          "type": "number",
+          "description": "Fighter.magicHitCountExpected."
+        },
+        "p": {
+          "type": "integer",
+          "description": "Fighter.offensivePraySuccessCount."
+        },
+        "g": {
+          "type": "integer",
+          "description": "Fighter.ghostBarrageCount."
+        },
+        "y": {
+          "type": "number",
+          "description": "Fighter.ghostBarrageExpectedDamage."
+        },
+        "H": {
+          "type": "integer",
+          "description": "Fighter.hpHealed."
+        },
+        "rh": {
+          "type": "integer",
+          "description": "Fighter.robeHits."
+        },
+        "x": {
+          "type": "boolean",
+          "description": "Fighter.dead."
+        },
+        "l": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FightLogEntry"
+          },
+          "description": "Fighter.fightLogEntries."
+        }
+      },
+      "required": ["n", "a", "s", "d", "h", "z", "m", "M", "p", "g", "y", "H", "rh", "x", "l"],
+      "additionalProperties": false
+    },
+    "FightLogEntry": {
+      "type": "object",
+      "properties": {
+        "t": {
+          "type": "integer",
+          "description": "FightLogEntry.time as epoch milliseconds."
+        },
+        "T": {
+          "type": "integer",
+          "description": "FightLogEntry.tick."
+        },
+        "f": {
+          "type": "boolean",
+          "description": "FightLogEntry.isFullEntry."
+        },
+        "G": {
+          "$ref": "#/definitions/EquipmentIds",
+          "description": "FightLogEntry.attackerGear."
+        },
+        "O": {
+          "$ref": "#/definitions/HeadIconValue",
+          "description": "FightLogEntry.attackerOverhead. Serialized from RuneLite HeadIcon names when present."
+        },
+        "m": {
+          "type": "string",
+          "description": "FightLogEntry.animationData enum name."
+        },
+        "d": {
+          "type": "number",
+          "description": "FightLogEntry.expectedDamage."
+        },
+        "a": {
+          "type": "number",
+          "description": "FightLogEntry.accuracy."
+        },
+        "h": {
+          "type": "integer",
+          "description": "FightLogEntry.maxHit."
+        },
+        "l": {
+          "type": "integer",
+          "description": "FightLogEntry.minHit."
+        },
+        "s": {
+          "type": "boolean",
+          "description": "FightLogEntry.splash."
+        },
+        "C": {
+          "oneOf": [
+            { "$ref": "#/definitions/CombatLevels" },
+            { "type": "null" }
+          ],
+          "description": "FightLogEntry.attackerLevels when present."
+        },
+        "k": {
+          "type": ["number", "null"],
+          "description": "FightLogEntry.koChance when present."
+        },
+        "eH": {
+          "type": ["integer", "null"],
+          "description": "FightLogEntry.estimatedHpBeforeHit when present."
+        },
+        "oH": {
+          "type": ["integer", "null"],
+          "description": "FightLogEntry.opponentMaxHp when present."
+        },
+        "mC": {
+          "type": "integer",
+          "description": "FightLogEntry.matchedHitsCount."
+        },
+        "aD": {
+          "type": ["integer", "null"],
+          "description": "FightLogEntry.actualDamageSum."
+        },
+        "g": {
+          "$ref": "#/definitions/EquipmentIds",
+          "description": "FightLogEntry.defenderGear."
+        },
+        "o": {
+          "$ref": "#/definitions/HeadIconValue",
+          "description": "FightLogEntry.defenderOverhead. Serialized from RuneLite HeadIcon names when present."
+        },
+        "R": {
+          "type": ["integer", "null"],
+          "description": "Local player's actual equipped ring item id when this full attack entry was recorded."
+        },
+        "A": {
+          "type": ["integer", "null"],
+          "description": "Local player's actual equipped ammo item id when this full attack entry was recorded."
+        },
+        "E": {
+          "type": "boolean",
+          "description": "FightLogEntry.defenderElyProc."
+        },
+        "S": {
+          "type": "boolean",
+          "description": "FightLogEntry.defenderSotdMeleeReductionProc."
+        },
+        "p": {
+          "type": "integer",
+          "description": "FightLogEntry.attackerOffensivePray sprite id."
+        },
+        "expectedHits": {
+          "type": "integer",
+          "description": "FightLogEntry.expectedHits."
+        },
+        "GMS": {
+          "type": "boolean",
+          "description": "FightLogEntry.isGmaulSpecial."
+        },
+        "displayHpBefore": {
+          "type": ["integer", "null"],
+          "description": "FightLogEntry.displayHpBefore when post-processed."
+        },
+        "displayHpAfter": {
+          "type": ["integer", "null"],
+          "description": "FightLogEntry.displayHpAfter when post-processed."
+        },
+        "displayKoChance": {
+          "type": ["number", "null"],
+          "description": "FightLogEntry.displayKoChance when post-processed."
+        },
+        "isPartOfTickGroup": {
+          "type": "boolean",
+          "description": "FightLogEntry.isPartOfTickGroup."
+        }
+      },
+      "required": ["t", "T", "f", "d", "a", "h", "l", "s", "mC", "aD", "E", "S", "p", "expectedHits", "GMS", "isPartOfTickGroup"],
+      "additionalProperties": false
+    },
+    "CombatLevels": {
+      "type": "object",
+      "properties": {
+        "a": {
+          "type": "integer",
+          "description": "CombatLevels.atk."
+        },
+        "s": {
+          "type": "integer",
+          "description": "CombatLevels.str."
+        },
+        "d": {
+          "type": "integer",
+          "description": "CombatLevels.def."
+        },
+        "r": {
+          "type": "integer",
+          "description": "CombatLevels.range."
+        },
+        "m": {
+          "type": "integer",
+          "description": "CombatLevels.mage."
+        },
+        "h": {
+          "type": "integer",
+          "description": "CombatLevels.hp."
+        }
+      },
+      "required": ["a", "s", "d", "r", "m", "h"],
+      "additionalProperties": false
+    },
+    "EquipmentIds": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "HeadIconValue": {
+      "type": ["string", "null"],
+      "description": "RuneLite HeadIcon enum name or null. Kept open-ended because the plugin serializes enum names directly and upstream may add values."
+    }
+  }
+}

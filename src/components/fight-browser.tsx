@@ -1,8 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./fight-browser.module.css";
 import type { FightDetail, FightLogEntry, FightPerformance, FightSummary, PlayerSummary, DashboardStats, PlayerStats } from "@/src/types/fights";
 import { WEAPON_IMAGES_BY_ITEM_ID } from "@/src/lib/weapon-images";
@@ -625,6 +624,29 @@ function attackerDataForEntry(fight: FightPerformance, entry: FightLogEntry) {
   return { attacker: fight.o, defenderName: fight.c?.n, attackerName };
 }
 
+function findNearestAttackSnapshot(entries: FightLogEntry[] | undefined, target: FightLogEntry) {
+  const fullEntries = (entries ?? []).filter((entry) => entry?.f);
+  if (fullEntries.length === 0) {
+    return null;
+  }
+
+  return fullEntries.reduce<FightLogEntry | null>((closest, candidate) => {
+    if (!closest) {
+      return candidate;
+    }
+
+    const candidateTickDiff = Math.abs((candidate.T ?? 0) - (target.T ?? 0));
+    const closestTickDiff = Math.abs((closest.T ?? 0) - (target.T ?? 0));
+    if (candidateTickDiff !== closestTickDiff) {
+      return candidateTickDiff < closestTickDiff ? candidate : closest;
+    }
+
+    const candidateTimeDiff = Math.abs((candidate.t ?? 0) - (target.t ?? 0));
+    const closestTimeDiff = Math.abs((closest.t ?? 0) - (target.t ?? 0));
+    return candidateTimeDiff < closestTimeDiff ? candidate : closest;
+  }, null);
+}
+
 function offPrayPercentage(fighter: FightPerformance["c"]) {
   return fighter?.a ? (fighter.s / fighter.a) * 100 : 0;
 }
@@ -818,10 +840,6 @@ function HomeDashboard({
     <div className={styles.dashboardContainer}>
       {/* Hero Section */}
       <section className={styles.heroSection}>
-        <div className={styles.heroBadge}>
-          <Image src="/Oddskull.png" alt="" width={14} height={14} aria-hidden="true" />
-          <span>Battle Feed</span>
-        </div>
         <h1 className={styles.heroTitle}>OSRS PvP Fight Tracker</h1>
         <p className={styles.heroSubtitle}>
           Deep combat analytics for Old School RuneScape PvP. Track tick-perfect equipment switches, pray accuracy, damage luck, and KO setups.
@@ -962,8 +980,7 @@ function HomeDashboard({
       <section className={styles.pluginGuideCard}>
         <h3>Connect Your RuneLite Plugin</h3>
         <p>
-          Open RuneLite settings, find the <strong>PvP Performance Tracker</strong> plugin, and set the endpoint URL to:
-          <code> {typeof window !== "undefined" ? window.location.origin : ""}/api/fights</code>. New fights will pin to this board as soon as the client sends them.
+          Open RuneLite settings, find the <strong>PvP Performance Tracker</strong> plugin and enable the "Upload Fights to PvP-Hub.com" setting to automatically upload your fights! New fights will pin to this board as soon as the fight is over and the tracker overlay in-game goes away.
         </p>
       </section>
     </div>
@@ -981,11 +998,6 @@ function PlayerDashboard({
 }) {
   const [weaponPageStart, setWeaponPageStart] = useState(0);
   const [matchupPageStart, setMatchupPageStart] = useState(0);
-
-  useEffect(() => {
-    setWeaponPageStart(0);
-    setMatchupPageStart(0);
-  }, [stats?.playerName]);
 
   if (loading) {
     return (
@@ -1236,13 +1248,45 @@ type FightBrowserProps = {
   initialFightId?: string | null;
 };
 
+function buildFightBrowserPath(playerName: string | null, fightId: string | null) {
+  if (!playerName) {
+    return "/";
+  }
+
+  const encodedPlayer = encodeURIComponent(playerName);
+  if (!fightId) {
+    return `/${encodedPlayer}`;
+  }
+
+  return `/${encodedPlayer}/${fightId}`;
+}
+
+function readFightBrowserRoute() {
+  if (typeof window === "undefined") {
+    return {
+      playerName: null,
+      fightId: null,
+    };
+  }
+
+  const [playerName, fightId] = window.location.pathname
+    .split("/")
+    .filter(Boolean);
+
+  return {
+    playerName: playerName ? decodeURIComponent(playerName) : null,
+    fightId: fightId ?? null,
+  };
+}
+
 export function FightBrowser({
   initialPlayerName = null,
   initialFightId = null,
 }: FightBrowserProps) {
-  const router = useRouter();
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [playerFights, setPlayerFights] = useState<FightSummary[]>([]);
+  const [routePlayerName, setRoutePlayerName] = useState<string | null>(initialPlayerName);
+  const [routeFightId, setRouteFightId] = useState<string | null>(initialFightId);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(initialPlayerName);
   const [selectedFightId, setSelectedFightId] = useState<string | null>(initialFightId);
   const [selectedFight, setSelectedFight] = useState<FightDetail | null>(null);
@@ -1254,16 +1298,42 @@ export function FightBrowser({
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
+  const selectedPlayerRef = useRef(selectedPlayer);
+  const selectedFightIdRef = useRef(selectedFightId);
+  const hasLoadedPlayersRef = useRef(false);
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedPlayer(initialPlayerName);
-    setSelectedFightId(initialFightId);
+    selectedPlayerRef.current = selectedPlayer;
+  }, [selectedPlayer]);
+
+  useEffect(() => {
+    selectedFightIdRef.current = selectedFightId;
+  }, [selectedFightId]);
+
+  useEffect(() => {
+    setRoutePlayerName(initialPlayerName);
+    setRouteFightId(initialFightId);
   }, [initialFightId, initialPlayerName]);
+
+  useEffect(() => {
+    function handlePopState() {
+      const nextRoute = readFightBrowserRoute();
+      setRoutePlayerName(nextRoute.playerName);
+      setRouteFightId(nextRoute.fightId);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   useEffect(() => {
     if (selectedPlayer || selectedFightId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setGlobalStats(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatsLoading(false);
       return;
     }
 
@@ -1296,6 +1366,8 @@ export function FightBrowser({
     if (!player || selectedFightId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlayerStats(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatsLoading(false);
       return;
     }
 
@@ -1366,19 +1438,16 @@ export function FightBrowser({
   useEffect(() => {
     let cancelled = false;
 
-    async function bootstrap() {
+    async function ensurePlayersLoaded() {
+      if (hasLoadedPlayersRef.current) {
+        return;
+      }
+
       try {
         setLoading(true);
         setError("");
         await loadPlayers("");
-
-        if (initialPlayerName) {
-          await loadPlayerFights(initialPlayerName);
-        }
-
-        if (initialFightId) {
-          await loadFight(initialFightId);
-        }
+        hasLoadedPlayersRef.current = true;
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : "Unknown error");
@@ -1390,12 +1459,170 @@ export function FightBrowser({
       }
     }
 
-    void bootstrap();
+    void ensurePlayersLoaded();
 
     return () => {
       cancelled = true;
     };
-  }, [initialFightId, initialPlayerName, loadFight, loadPlayerFights, loadPlayers]);
+  }, [loadPlayers]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const currentPlayer = selectedPlayerRef.current;
+    const nextPlayer = routePlayerName;
+    const shouldKeepExistingFights =
+      currentPlayer === nextPlayer &&
+      (nextPlayer === null || playerFights.length > 0);
+
+    if (shouldKeepExistingFights) {
+      return;
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedPlayer(nextPlayer);
+    setError("");
+
+    if (!nextPlayer) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPlayerFights([]);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
+
+    async function syncPlayerRoute(playerName: string) {
+      try {
+        setLoading(true);
+        await loadPlayerFights(playerName);
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Unknown error");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void syncPlayerRoute(nextPlayer);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadPlayerFights, playerFights.length, routePlayerName]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const nextFightId = routeFightId;
+
+    if (selectedFightIdRef.current !== nextFightId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedFightId(nextFightId);
+    }
+
+    if (!nextFightId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedFight(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
+
+    if (selectedFight?.fight_id === nextFightId) {
+      return;
+    }
+
+    async function syncFightRoute(fightId: string) {
+      try {
+        setLoading(true);
+        setError("");
+        await loadFight(fightId);
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Unknown error");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void syncFightRoute(nextFightId);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadFight, routeFightId, selectedFight?.fight_id]);
+
+  useEffect(() => {
+    const eventSource = new EventSource("/api/stream");
+
+    eventSource.addEventListener("fight_added", (event) => {
+      try {
+        const newFight = JSON.parse(event.data) as FightSummary;
+
+        // 1. Always refresh players in sidebar
+        void loadPlayers("");
+
+        const currentSelectedPlayer = selectedPlayerRef.current;
+        const currentSelectedFightId = selectedFightIdRef.current;
+
+        // 2. If a player is selected and is part of this fight, refresh their fights and stats
+        if (currentSelectedPlayer) {
+          const lowerSelected = currentSelectedPlayer.toLowerCase();
+          if (
+            newFight.competitor_name.toLowerCase() === lowerSelected ||
+            newFight.opponent_name.toLowerCase() === lowerSelected
+          ) {
+            void loadPlayerFights(currentSelectedPlayer);
+
+            // Fetch player stats
+            void (async () => {
+              try {
+                const response = await fetch(`/api/players/${encodeURIComponent(currentSelectedPlayer)}/stats`);
+                if (response.ok) {
+                  const data = await response.json();
+                  setPlayerStats(data);
+                }
+              } catch (err) {
+                console.error("Failed to reload player stats via SSE:", err);
+              }
+            })();
+          }
+        } else if (!currentSelectedFightId) {
+          // 3. If no player is selected and we're not inside a fight details view, refresh global stats
+          void (async () => {
+            try {
+              const response = await fetch("/api/stats");
+              if (response.ok) {
+                const data = await response.json();
+                setGlobalStats(data);
+              }
+            } catch (err) {
+              console.error("Failed to reload global stats via SSE:", err);
+            }
+          })();
+        }
+
+        // 4. If the user is currently looking at this specific fight, reload the fight data (e.g. secondary POV added)
+        if (currentSelectedFightId === newFight.fight_id) {
+          void loadFight(currentSelectedFightId);
+        }
+      } catch (err) {
+        console.error("Error processing fight_added event:", err);
+      }
+    });
+
+    eventSource.onerror = (err) => {
+      console.error("SSE connection error:", err);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [loadPlayers, loadPlayerFights, loadFight]);
 
   const filteredPlayers = useMemo(
     () => players.filter((player) => player.player_name.toLowerCase().includes(search.toLowerCase())),
@@ -1416,6 +1643,20 @@ export function FightBrowser({
   const visibleLogs = selectedFight ? getFightLogs(selectedFight.full_data) : [];
   const selectedLog = visibleLogs[selectedLogIndex] ?? null;
 
+  function updateRoute(playerName: string | null, fightId: string | null) {
+    setRoutePlayerName(playerName);
+    setRouteFightId(fightId);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextPath = buildFightBrowserPath(playerName, fightId);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState(null, "", nextPath);
+    }
+  }
+
   function handlePlayerClick(playerName: string) {
     setLoading(true);
     setSelectedPlayer(playerName);
@@ -1423,26 +1664,27 @@ export function FightBrowser({
     setSelectedFight(null);
     setSelectedLogIndex(0);
     setError("");
-    router.push(`/${encodeURIComponent(playerName)}`);
+    updateRoute(playerName, null);
   }
 
   function handleFightClick(fight: FightSummary) {
     const playerName = selectedPlayer ?? fight.competitor_name;
     setSelectedFightId(fight.fight_id);
-    setSelectedFight(null);
     setSelectedLogIndex(0);
     setLoading(true);
-    router.push(`/${encodeURIComponent(playerName)}/${fight.fight_id}`);
+    setError("");
+    updateRoute(playerName, fight.fight_id);
   }
 
   function handleBack() {
+    setLoading(true);
     setSelectedPlayer(null);
     setSelectedFightId(null);
     setSelectedFight(null);
     setPlayerFights([]);
     setSelectedLogIndex(0);
     setError("");
-    router.push("/");
+    updateRoute(null, null);
   }
 
   return (
@@ -1533,21 +1775,17 @@ export function FightBrowser({
           ) : null}
 
           {!selectedFight ? (
-            loading ? (
-              <section className={styles.emptyState}>
-                <h2>Loading</h2>
-                <p className={styles.emptyCopy}>Retrieving OSRS fight data...</p>
-              </section>
-            ) : selectedPlayer ? (
+            selectedPlayer ? (
               <PlayerDashboard
+                key={selectedPlayer}
                 stats={playerStats}
-                loading={statsLoading}
+                loading={loading || statsLoading}
                 onPlayerClick={handlePlayerClick}
               />
             ) : (
               <HomeDashboard
                 stats={globalStats}
-                loading={statsLoading}
+                loading={loading || statsLoading}
                 onPlayerClick={handlePlayerClick}
                 onFightClick={handleFightClick}
               />
@@ -1780,20 +2018,17 @@ export function FightBrowser({
 
                   const aLevels = selectedLog.C || defaultLevels;
 
-                  // Find matching defender log to extract defender stats
-                  const opposingPov = getOpposingPov(fight.full_data);
                   const isCompetitorAttacker = attackerName === fight.full_data.c?.n;
-
-                  let matchingDefenderLog = null;
-                  if (opposingPov) {
-                    const defenderLogs = isCompetitorAttacker ? opposingPov.c?.l : opposingPov.o?.l;
-                    matchingDefenderLog = (defenderLogs || []).find((e) => e.T === selectedLog.T);
-                  }
+                  const defenderAttackLogs = isCompetitorAttacker ? fight.full_data.o?.l : fight.full_data.c?.l;
+                  const matchingDefenderLog = findNearestAttackSnapshot(defenderAttackLogs, selectedLog);
                   const dLevels = matchingDefenderLog?.C || defaultLevels;
 
                   // Render single equipment slot
                   const renderSlot = (itemId: number | undefined, slotName: string, placeholder?: string) => {
-                    const normalized = itemId && itemId > 0 ? (itemId > 2048 ? itemId - 2048 : itemId) : 0;
+                    const isRawId = slotName === "Ring" || slotName === "Ammunition";
+                    const normalized = itemId && itemId > 0
+                      ? (isRawId ? itemId : (itemId > 2048 ? itemId - 2048 : itemId))
+                      : 0;
                     const stats = fight.item_stats?.[normalized];
 
                     if (normalized > 0 && stats && stats.image_url) {
@@ -1833,11 +2068,15 @@ export function FightBrowser({
                   };
 
                   // Calculate attacker and defender bonuses
-                  const aBonuses = calculateBonuses(selectedLog.G);
-                  const dGear = matchingDefenderLog ? matchingDefenderLog.G : selectedLog.g;
-                  const dBonuses = calculateBonuses(dGear);
+                  const aBonuses = calculateBonuses(selectedLog.G, selectedLog.R, selectedLog.A);
+                  const dGear = matchingDefenderLog?.G ?? selectedLog.g;
+                  const dBonuses = calculateBonuses(dGear, matchingDefenderLog?.R, matchingDefenderLog?.A);
 
-                  function calculateBonuses(gear: number[] | undefined) {
+                  function calculateBonuses(
+                    gear: number[] | undefined,
+                    ringIdFromLog: number | null | undefined,
+                    ammoIdFromLog: number | null | undefined
+                  ) {
                     const b = {
                       stabAtk: 0, slashAtk: 0, crushAtk: 0, magicAtk: 0, rangedAtk: 0,
                       stabDef: 0, slashDef: 0, crushDef: 0, magicDef: 0, rangedDef: 0,
@@ -1868,13 +2107,23 @@ export function FightBrowser({
                       }
                     }
 
-                    // Weapon ammo strength
-                    const weaponId = gear[3] ? (gear[3] > 2048 ? gear[3] - 2048 : gear[3]) : 0;
-                    b.rstr += getWeaponAmmoStrength(weaponId);
+                    // Ammo strength calculation
+                    if (ammoIdFromLog && ammoIdFromLog > 0) {
+                      const ammoStats = fight.item_stats?.[ammoIdFromLog];
+                      if (ammoStats) {
+                        b.rstr += Number(ammoStats.ranged_strength || 0);
+                      } else {
+                        const weaponId = gear[3] ? (gear[3] > 2048 ? gear[3] - 2048 : gear[3]) : 0;
+                        b.rstr += getWeaponAmmoStrength(weaponId);
+                      }
+                    } else {
+                      const weaponId = gear[3] ? (gear[3] > 2048 ? gear[3] - 2048 : gear[3]) : 0;
+                      b.rstr += getWeaponAmmoStrength(weaponId);
+                    }
 
-                    // Add default ring bonuses
-                    const ring = getDefaultRing(fightType);
-                    const ringStats = fight.item_stats?.[ring.id];
+                    // Add ring bonuses
+                    const ringId = ringIdFromLog && ringIdFromLog > 0 ? ringIdFromLog : getDefaultRing(fightType).id;
+                    const ringStats = fight.item_stats?.[ringId];
                     if (ringStats) {
                       b.stabAtk += Number(ringStats.stab_attack || 0);
                       b.slashAtk += Number(ringStats.slash_attack || 0);
@@ -1980,7 +2229,9 @@ export function FightBrowser({
                             {/* Row 2 */}
                             {renderSlot(selectedLog.G?.[1], "Cape")}
                             {renderSlot(selectedLog.G?.[2], "Amulet")}
-                            {aAmmo ? (
+                            {selectedLog.A && selectedLog.A > 0 ? (
+                              renderSlot(selectedLog.A, "Ammunition")
+                            ) : aAmmo ? (
                               <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${aAmmo.name} (Ammunition)`}>
                                 <Image src={aAmmo.src} alt={aAmmo.name} width={32} height={32} />
                               </div>
@@ -1999,9 +2250,13 @@ export function FightBrowser({
                             {/* Row 5 */}
                             {renderSlot(selectedLog.G?.[9], "Hands")}
                             {renderSlot(selectedLog.G?.[10], "Feet")}
-                            <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${defaultRingObj.name} (Ring)`}>
-                              <Image src={defaultRingObj.src} alt={defaultRingObj.name} width={32} height={32} />
-                            </div>
+                            {selectedLog.R && selectedLog.R > 0 ? (
+                              renderSlot(selectedLog.R, "Ring")
+                            ) : (
+                              <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${defaultRingObj.name} (Ring)`}>
+                                <Image src={defaultRingObj.src} alt={defaultRingObj.name} width={32} height={32} />
+                              </div>
+                            )}
                           </div>
 
                           {/* Bonuses */}
@@ -2095,7 +2350,9 @@ export function FightBrowser({
                             {/* Row 2 */}
                             {renderSlot(dGear?.[1], "Cape")}
                             {renderSlot(dGear?.[2], "Amulet")}
-                            {dAmmo ? (
+                            {matchingDefenderLog?.A && matchingDefenderLog.A > 0 ? (
+                              renderSlot(matchingDefenderLog.A, "Ammunition")
+                            ) : dAmmo ? (
                               <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${dAmmo.name} (Ammunition)`}>
                                 <Image src={dAmmo.src} alt={dAmmo.name} width={32} height={32} />
                               </div>
@@ -2114,9 +2371,13 @@ export function FightBrowser({
                             {/* Row 5 */}
                             {renderSlot(dGear?.[9], "Hands")}
                             {renderSlot(dGear?.[10], "Feet")}
-                            <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${defaultRingObj.name} (Ring)`}>
-                              <Image src={defaultRingObj.src} alt={defaultRingObj.name} width={32} height={32} />
-                            </div>
+                            {matchingDefenderLog?.R && matchingDefenderLog.R > 0 ? (
+                              renderSlot(matchingDefenderLog.R, "Ring")
+                            ) : (
+                              <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${defaultRingObj.name} (Ring)`}>
+                                <Image src={defaultRingObj.src} alt={defaultRingObj.name} width={32} height={32} />
+                              </div>
+                            )}
                           </div>
 
                           {/* Bonuses */}

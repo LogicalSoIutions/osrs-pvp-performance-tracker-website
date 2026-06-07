@@ -160,16 +160,16 @@ const BOLT_AMMO: Record<string, AmmoData> = {
   RUNITE_BOLTS: { name: "RUNITE_BOLTS", itemId: 9169, rangeStr: 115, dmgModifier: 1 },
   DRAGONSTONE_BOLTS_E: {
     name: "DRAGONSTONE_BOLTS_E",
-    itemId: 9281,
+    itemId: 9244,
     rangeStr: 117,
     dmgModifier: 1,
     specRangeLevelModifier: 0.2,
     specChance: 0.06,
   },
-  DIAMOND_BOLTS_E: { name: "DIAMOND_BOLTS_E", itemId: 9277, rangeStr: 105, dmgModifier: 1.015 },
+  DIAMOND_BOLTS_E: { name: "DIAMOND_BOLTS_E", itemId: 9243, rangeStr: 105, dmgModifier: 1.015 },
   DRAGONSTONE_DRAGON_BOLTS_E: {
     name: "DRAGONSTONE_DRAGON_BOLTS_E",
-    itemId: 1668,
+    itemId: 21948,
     rangeStr: 122,
     dmgModifier: 1,
     specRangeLevelModifier: 0.2,
@@ -177,13 +177,13 @@ const BOLT_AMMO: Record<string, AmmoData> = {
   },
   OPAL_DRAGON_BOLTS_E: {
     name: "OPAL_DRAGON_BOLTS_E",
-    itemId: 8729,
+    itemId: 21932,
     rangeStr: 122,
     dmgModifier: 1,
     specRangeLevelModifier: 0.1,
     specChance: 0.05,
   },
-  DIAMOND_DRAGON_BOLTS_E: { name: "DIAMOND_DRAGON_BOLTS_E", itemId: 1690, rangeStr: 122, dmgModifier: 1.015 },
+  DIAMOND_DRAGON_BOLTS_E: { name: "DIAMOND_DRAGON_BOLTS_E", itemId: 21946, rangeStr: 122, dmgModifier: 1.015 },
   ADAMANT_DARTS: { name: "ADAMANT_DARTS", itemId: 810, rangeStr: 10, dmgModifier: 1 },
   RUNE_DARTS: { name: "RUNE_DARTS", itemId: 811, rangeStr: 14, dmgModifier: 1 },
   DRAGON_DARTS: { name: "DRAGON_DARTS", itemId: 11230, rangeStr: 20, dmgModifier: 1 },
@@ -639,6 +639,12 @@ export function collectFightItemIdsForMerge(primary: FightPerformance, secondary
           const normalized = normalizeItemId(itemId);
           if (normalized > 0) ids.add(normalized);
         }
+        if (entry.R && entry.R > 0) {
+          ids.add(entry.R);
+        }
+        if (entry.A && entry.A > 0) {
+          ids.add(entry.A);
+        }
       }
     }
     ids.add(getRingItemId(getRingName(fight.l)));
@@ -658,6 +664,8 @@ export function recalculateMergedEntry(
   const config = getResolvedConfig();
   const ringName = getRingName(fight.l, attackLog);
   const ringItemId = getRingItemId(ringName);
+  const defenderRingName = getRingName(fight.l, defenderLog);
+  const defenderRingItemId = getRingItemId(defenderRingName);
   const attackerLevels: CombatLevels = attackLog.C ?? { a: 118, s: 118, d: 120, r: 112, m: 99, h: 99 };
   const defenderLevels: CombatLevels = defenderLog.C ?? { a: 118, s: 118, d: 120, r: 112, m: 99, h: 99 };
   const attackerGear = attackLog.G ?? [];
@@ -670,7 +678,7 @@ export function recalculateMergedEntry(
   const voidStyle = getVoidStyle(attackerGear);
   const isLmsFight = fight.l.startsWith("LMS_");
   const playerStats = calculateBonuses(attackerGear, itemStatsById, ringItemId);
-  const opponentStats = calculateBonuses(defenderGear, itemStatsById, ringItemId);
+  const opponentStats = calculateBonuses(defenderGear, itemStatsById, defenderRingItemId);
   const ammo = getAmmoByItemId(attackLog.A) ?? getAmmoForWeapon(weaponName, config, isLmsFight);
   const smokeBstaff = weaponName === "SMOKE_BATTLESTAFF";
   const tomeOfFire = normalizeItemId(attackerGear[SLOT_SHIELD]) === 20714 || normalizeItemId(attackerGear[SLOT_SHIELD]) === 27358;

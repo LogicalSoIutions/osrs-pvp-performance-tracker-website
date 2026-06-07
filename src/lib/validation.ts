@@ -3,7 +3,7 @@ import path from "path";
 import Ajv, { type ErrorObject } from "ajv";
 import type { FightPerformance } from "@/src/types/fights";
 
-const schemaPath = path.join(process.cwd(), "..", "pvp_fight_schema.json");
+const schemaPath = path.join(process.cwd(), ".", "pvp_fight_schema.json");
 const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8")) as object;
 const ajv = new Ajv({ allErrors: true });
 

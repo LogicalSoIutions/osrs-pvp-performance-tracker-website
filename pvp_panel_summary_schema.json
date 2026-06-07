@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PvpFightPanelSummaryList",
+  "description": "Summary rows matching the FightPerformancePanel UI output and TrackedStatistic acronyms.",
+  "type": "array",
+  "items": {
+    "$ref": "#/definitions/FightPanelSummary"
+  },
+  "definitions": {
+    "FightPanelSummary": {
+      "type": "object",
+      "properties": {
+        "competitor": {
+          "$ref": "#/definitions/FighterSummary"
+        },
+        "opponent": {
+          "$ref": "#/definitions/FighterSummary"
+        },
+        "world": {
+          "type": "string",
+          "pattern": "^W\\d+$",
+          "description": "Centered world label shown by FightPerformancePanel when enabled."
+        },
+        "timestamp": {
+          "type": "string",
+          "pattern": "^\\d{2}:\\d{2}:\\d{2} on \\d{4}/\\d{2}/\\d{2}$",
+          "description": "FightPerformancePanel tooltip timestamp format."
+        }
+      },
+      "required": ["competitor", "opponent", "world", "timestamp"],
+      "additionalProperties": false
+    },
+    "FighterSummary": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "is_dead": {
+          "type": "boolean"
+        },
+        "stats": {
+          "$ref": "#/definitions/PanelStats"
+        }
+      },
+      "required": ["name", "is_dead", "stats"],
+      "additionalProperties": false
+    },
+    "PanelStats": {
+      "type": "object",
+      "properties": {
+        "OP": {
+          "type": "string",
+          "pattern": "^\\d+/\\d+ \\(\\d+(\\.\\d+)?%\\)$"
+        },
+        "eD": {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+)? \\([+-]\\d+(\\.\\d+)?\\)$"
+        },
+        "D": {
+          "type": "string",
+          "pattern": "^\\d+ \\([+-]\\d+\\)$"
+        },
+        "M": {
+          "type": "string",
+          "pattern": "^\\d+/\\d+ \\(\\d+(\\.\\d+)?%\\)$"
+        },
+        "P": {
+          "$ref": "#/definitions/NoDataOrFractionPercent"
+        },
+        "HP": {
+          "$ref": "#/definitions/NoDataOrInteger"
+        },
+        "rH": {
+          "type": "string",
+          "pattern": "^\\d+/\\d+ \\(\\d+(\\.\\d+)?%\\)$"
+        },
+        "KO": {
+          "$ref": "#/definitions/KoSummary"
+        },
+        "GB": {
+          "type": "string",
+          "pattern": "^\\d+ G\\.B\\. \\(\\d+(\\.\\d+)?\\)$"
+        }
+      },
+      "required": ["OP", "eD", "D", "M", "P", "HP", "rH", "KO"],
+      "additionalProperties": false
+    },
+    "NoDataOrFractionPercent": {
+      "type": "string",
+      "anyOf": [
+        { "const": "N/A" },
+        { "pattern": "^\\d+/\\d+ \\(\\d+(\\.\\d+)?%\\)$" }
+      ]
+    },
+    "NoDataOrInteger": {
+      "type": "string",
+      "anyOf": [
+        { "const": "N/A" },
+        { "pattern": "^\\d+$" }
+      ]
+    },
+    "KoSummary": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^\\d+$" },
+        { "pattern": "^\\d+ \\(\\d+(\\.\\d+)?%\\)$" }
+      ]
+    }
+  }
+}

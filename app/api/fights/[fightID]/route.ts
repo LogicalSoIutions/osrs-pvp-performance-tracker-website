@@ -41,6 +41,12 @@ export async function GET(_request: Request, { params }: FightRouteProps) {
             }
           }
         }
+        if (entry?.R && entry.R > 0) {
+          itemIdsSet.add(entry.R);
+        }
+        if (entry?.A && entry.A > 0) {
+          itemIdsSet.add(entry.A);
+        }
       }
     };
 
