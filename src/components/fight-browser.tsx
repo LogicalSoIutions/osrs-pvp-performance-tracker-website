@@ -829,11 +829,7 @@ function HomeDashboard({
   }
 
   if (!stats) {
-    return (
-      <div className={styles.statsError}>
-        <p>No statistics available. Start uploading fights using the RuneLite plugin!</p>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -1009,11 +1005,7 @@ function PlayerDashboard({
   }
 
   if (!stats) {
-    return (
-      <div className={styles.statsError}>
-        <p>No statistics available for this player.</p>
-      </div>
-    );
+    return null;
   }
 
   const winRatePercent = (stats.winRate * 100).toFixed(1);
