@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     siteName: "PvP-Hub",
     images: [
       {
-        url: "/skull.png",
+        url: "/Skull.png",
         width: 512,
         height: 512,
         alt: "PvP-Hub OSRS PvP Analytics",
@@ -49,17 +49,17 @@ export const metadata: Metadata = {
     title: "PvP-Hub | OSRS PvP Performance Analytics",
     description:
       "Track OSRS PvP fights, analyze PvP stats, and improve your PKing performance with PvP-Hub.",
-    images: ["/skull.png"],
+    images: ["/Skull.png"],
   },
   icons: {
     icon: [
       {
-        url: "/skull.png",
+        url: "/Skull.png",
         type: "image/png",
       },
     ],
-    shortcut: "/skull.png",
-    apple: "/skull.png",
+    shortcut: "/Skull.png",
+    apple: "/Skull.png",
   },
   category: "gaming",
 };
