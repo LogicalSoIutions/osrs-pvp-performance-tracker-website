@@ -1309,6 +1309,41 @@
   word-break: break-all;
 }
 
+.privacyCard {
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 20px 24px;
+  box-shadow: var(--shadow), var(--inset-border);
+}
+
+.privacyCard h3 {
+  margin: 0 0 8px;
+  color: var(--gold-light);
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--display-font);
+}
+
+.privacyCard p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.privacyLink {
+  color: var(--warning);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.privacyLink:hover {
+  color: var(--gold-light);
+}
+
 /* Player Profile specific styles */
 
 .playerHeaderBanner {
