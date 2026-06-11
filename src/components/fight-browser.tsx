@@ -624,6 +624,19 @@ function attackerDataForEntry(fight: FightPerformance, entry: FightLogEntry) {
   return { attacker: fight.o, defenderName: fight.c?.n, attackerName };
 }
 
+function compareFightLogOrder(left: FightLogEntry, right: FightLogEntry) {
+  const tickDiff = (left.T ?? 0) - (right.T ?? 0);
+  if (tickDiff !== 0) {
+    return tickDiff;
+  }
+
+  return (left.t ?? 0) - (right.t ?? 0);
+}
+
+function hasEquipmentSnapshot(gear: number[] | undefined) {
+  return Array.isArray(gear) && gear.some((id) => id > 0);
+}
+
 function findNearestAttackSnapshot(entries: FightLogEntry[] | undefined, target: FightLogEntry) {
   const fullEntries = (entries ?? []).filter((entry) => entry?.f);
   if (fullEntries.length === 0) {
@@ -645,6 +658,36 @@ function findNearestAttackSnapshot(entries: FightLogEntry[] | undefined, target:
     const closestTimeDiff = Math.abs((closest.t ?? 0) - (target.t ?? 0));
     return candidateTimeDiff < closestTimeDiff ? candidate : closest;
   }, null);
+}
+
+function findLatestEquipmentSnapshot(
+  entries: FightLogEntry[] | undefined,
+  target: FightLogEntry,
+  gearKey: "G" | "g",
+) {
+  const candidates = (entries ?? []).filter((entry) => hasEquipmentSnapshot(gearKey === "G" ? entry.G : entry.g));
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  let latestKnown: FightLogEntry | null = null;
+  let nextKnown: FightLogEntry | null = null;
+
+  for (const candidate of candidates) {
+    const comparison = compareFightLogOrder(candidate, target);
+    if (comparison <= 0) {
+      if (!latestKnown || compareFightLogOrder(candidate, latestKnown) > 0) {
+        latestKnown = candidate;
+      }
+      continue;
+    }
+
+    if (!nextKnown || compareFightLogOrder(candidate, nextKnown) < 0) {
+      nextKnown = candidate;
+    }
+  }
+
+  return latestKnown ?? nextKnown;
 }
 
 function offPrayPercentage(fighter: FightPerformance["c"]) {
@@ -2001,9 +2044,21 @@ export function FightBrowser({
                   const aLevels = selectedLog.C || defaultLevels;
 
                   const isCompetitorAttacker = attackerName === fight.full_data.c?.n;
+                  const attackerAttackLogs = isCompetitorAttacker ? fight.full_data.c?.l : fight.full_data.o?.l;
                   const defenderAttackLogs = isCompetitorAttacker ? fight.full_data.o?.l : fight.full_data.c?.l;
                   const matchingDefenderLog = findNearestAttackSnapshot(defenderAttackLogs, selectedLog);
-                  const dLevels = matchingDefenderLog?.C || defaultLevels;
+                  const attackerEquipmentSnapshot = findLatestEquipmentSnapshot(attackerAttackLogs, selectedLog, "G");
+                  const defenderEquipmentSnapshot = findLatestEquipmentSnapshot(defenderAttackLogs, selectedLog, "G");
+                  const observedDefenderSnapshot = findLatestEquipmentSnapshot(attackerAttackLogs, selectedLog, "g");
+
+                  const attackerGear = attackerEquipmentSnapshot?.G ?? selectedLog.G;
+                  const attackerRing = attackerEquipmentSnapshot?.R ?? selectedLog.R;
+                  const attackerAmmoId = attackerEquipmentSnapshot?.A ?? selectedLog.A;
+
+                  const dGear = defenderEquipmentSnapshot?.G ?? observedDefenderSnapshot?.g ?? selectedLog.g;
+                  const defenderRing = defenderEquipmentSnapshot?.R;
+                  const defenderAmmoId = defenderEquipmentSnapshot?.A;
+                  const dLevels = defenderEquipmentSnapshot?.C || matchingDefenderLog?.C || defaultLevels;
 
                   // Render single equipment slot
                   const renderSlot = (itemId: number | undefined, slotName: string, placeholder?: string) => {
@@ -2050,9 +2105,8 @@ export function FightBrowser({
                   };
 
                   // Calculate attacker and defender bonuses
-                  const aBonuses = calculateBonuses(selectedLog.G, selectedLog.R, selectedLog.A);
-                  const dGear = matchingDefenderLog?.G ?? selectedLog.g;
-                  const dBonuses = calculateBonuses(dGear, matchingDefenderLog?.R, matchingDefenderLog?.A);
+                  const aBonuses = calculateBonuses(attackerGear, attackerRing, attackerAmmoId);
+                  const dBonuses = calculateBonuses(dGear, defenderRing, defenderAmmoId);
 
                   function calculateBonuses(
                     gear: number[] | undefined,
@@ -2128,7 +2182,7 @@ export function FightBrowser({
                   }
 
                   // Ammo and Ring configuration
-                  const aWeaponId = selectedLog.G ? getWeaponItemId(selectedLog.G) : null;
+                  const aWeaponId = attackerGear ? getWeaponItemId(attackerGear) : null;
                   const aAmmo = aWeaponId ? getWeaponAmmoIconAndName(aWeaponId) : null;
                   const dWeaponId = dGear ? getWeaponItemId(dGear) : null;
                   const dAmmo = dWeaponId ? getWeaponAmmoIconAndName(dWeaponId) : null;
@@ -2205,14 +2259,14 @@ export function FightBrowser({
                           <div className={styles.equipmentGrid}>
                             {/* Row 1 */}
                             <div />
-                            {renderSlot(selectedLog.G?.[0], "Head")}
+                            {renderSlot(attackerGear?.[0], "Head")}
                             <div />
 
                             {/* Row 2 */}
-                            {renderSlot(selectedLog.G?.[1], "Cape")}
-                            {renderSlot(selectedLog.G?.[2], "Amulet")}
-                            {selectedLog.A && selectedLog.A > 0 ? (
-                              renderSlot(selectedLog.A, "Ammunition")
+                            {renderSlot(attackerGear?.[1], "Cape")}
+                            {renderSlot(attackerGear?.[2], "Amulet")}
+                            {attackerAmmoId && attackerAmmoId > 0 ? (
+                              renderSlot(attackerAmmoId, "Ammunition")
                             ) : aAmmo ? (
                               <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${aAmmo.name} (Ammunition)`}>
                                 <Image src={aAmmo.src} alt={aAmmo.name} width={32} height={32} />
@@ -2220,20 +2274,20 @@ export function FightBrowser({
                             ) : renderSlot(undefined, "Ammunition")}
 
                             {/* Row 3 */}
-                            {renderSlot(selectedLog.G?.[3], "Weapon")}
-                            {renderSlot(selectedLog.G?.[4], "Torso")}
-                            {renderSlot(selectedLog.G?.[5], "Shield")}
+                            {renderSlot(attackerGear?.[3], "Weapon")}
+                            {renderSlot(attackerGear?.[4], "Torso")}
+                            {renderSlot(attackerGear?.[5], "Shield")}
 
                             {/* Row 4 */}
                             <div />
-                            {renderSlot(selectedLog.G?.[7], "Legs")}
+                            {renderSlot(attackerGear?.[7], "Legs")}
                             <div />
 
                             {/* Row 5 */}
-                            {renderSlot(selectedLog.G?.[9], "Hands")}
-                            {renderSlot(selectedLog.G?.[10], "Feet")}
-                            {selectedLog.R && selectedLog.R > 0 ? (
-                              renderSlot(selectedLog.R, "Ring")
+                            {renderSlot(attackerGear?.[9], "Hands")}
+                            {renderSlot(attackerGear?.[10], "Feet")}
+                            {attackerRing && attackerRing > 0 ? (
+                              renderSlot(attackerRing, "Ring")
                             ) : (
                               <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${defaultRingObj.name} (Ring)`}>
                                 <Image src={defaultRingObj.src} alt={defaultRingObj.name} width={32} height={32} />
@@ -2283,10 +2337,10 @@ export function FightBrowser({
                             </div>
                             <div className={styles.prayerRow}>
                               <span className={styles.prayerTitle}>Offensive:</span>
-                              {matchingDefenderLog ? (
+                              {defenderEquipmentSnapshot ?? matchingDefenderLog ? (
                                 <IconLabel
-                                  icon={getOffensivePrayerIcon(matchingDefenderLog.p)}
-                                  text={getOffensivePrayerText(matchingDefenderLog.p)}
+                                  icon={getOffensivePrayerIcon((defenderEquipmentSnapshot ?? matchingDefenderLog)?.p)}
+                                  text={getOffensivePrayerText((defenderEquipmentSnapshot ?? matchingDefenderLog)?.p)}
                                 />
                               ) : (
                                 <span className={styles.popoutNA}>N/A</span>
@@ -2332,8 +2386,8 @@ export function FightBrowser({
                             {/* Row 2 */}
                             {renderSlot(dGear?.[1], "Cape")}
                             {renderSlot(dGear?.[2], "Amulet")}
-                            {matchingDefenderLog?.A && matchingDefenderLog.A > 0 ? (
-                              renderSlot(matchingDefenderLog.A, "Ammunition")
+                            {defenderAmmoId && defenderAmmoId > 0 ? (
+                              renderSlot(defenderAmmoId, "Ammunition")
                             ) : dAmmo ? (
                               <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${dAmmo.name} (Ammunition)`}>
                                 <Image src={dAmmo.src} alt={dAmmo.name} width={32} height={32} />
@@ -2353,8 +2407,8 @@ export function FightBrowser({
                             {/* Row 5 */}
                             {renderSlot(dGear?.[9], "Hands")}
                             {renderSlot(dGear?.[10], "Feet")}
-                            {matchingDefenderLog?.R && matchingDefenderLog.R > 0 ? (
-                              renderSlot(matchingDefenderLog.R, "Ring")
+                            {defenderRing && defenderRing > 0 ? (
+                              renderSlot(defenderRing, "Ring")
                             ) : (
                               <div className={`${styles.eqSlot} ${styles.tooltipTarget}`} data-tooltip={`${defaultRingObj.name} (Ring)`}>
                                 <Image src={defaultRingObj.src} alt={defaultRingObj.name} width={32} height={32} />
