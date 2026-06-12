@@ -29,14 +29,16 @@ export async function POST(request: Request) {
 
     const insertedFights = await insertFightsBulk(validation.fights);
 
-    for (const fight of insertedFights) {
-      broadcast("fight_added", fight);
+    for (const insertedFight of insertedFights) {
+      if (insertedFight.isPublic) {
+        broadcast("fight_added", insertedFight.fight);
+      }
     }
 
     return NextResponse.json(
       {
         message: `Successfully stored ${insertedFights.length} fight(s)`,
-        fights: insertedFights,
+        fights: insertedFights.map(({ fight }) => fight),
       },
       { status: 201 },
     );

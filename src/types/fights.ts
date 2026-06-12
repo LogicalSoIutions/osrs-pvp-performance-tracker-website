@@ -72,6 +72,10 @@ export type FightPerformance = {
   _secondaryFight?: FightPerformance | null;
 };
 
+export type UploadedFightPayload = FightPerformance & {
+  publicDelaySeconds?: number;
+};
+
 export type FightSummary = {
   id: number;
   fight_id: string;
@@ -154,4 +158,3 @@ export type PlayerStats = {
   weaponsUsed: { name: string; count: number; src: string | null }[];
   headToHead: { opponent: string; wins: number; losses: number; total: number }[];
 };
-

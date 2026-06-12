@@ -4,10 +4,10 @@
   "description": "Serialized FightPerformance records emitted by the RuneLite plugin source.",
   "type": "array",
   "items": {
-    "$ref": "#/definitions/FightPerformance"
+    "$ref": "#/definitions/UploadedFightPerformance"
   },
   "definitions": {
-    "FightPerformance": {
+    "UploadedFightPerformance": {
       "type": "object",
       "properties": {
         "c": {
@@ -35,6 +35,12 @@
         "w": {
           "type": "integer",
           "description": "FightPerformance.world."
+        },
+        "publicDelaySeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18000,
+          "description": "Optional upload-only public visibility delay in seconds."
         }
       },
       "required": ["c", "o", "t", "fightID", "l", "w"],

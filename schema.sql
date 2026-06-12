@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS fights (
     opponent_dead BOOLEAN NOT NULL,
     full_data JSONB NOT NULL,
     secondary_data JSONB NULL,
+    public_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -29,6 +30,8 @@ CREATE TABLE IF NOT EXISTS fight_uploads (
     competitor_dead BOOLEAN NOT NULL,
     opponent_dead BOOLEAN NOT NULL,
     full_data JSONB NOT NULL,
+    public_delay_seconds INT NOT NULL DEFAULT 0,
+    public_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (fight_id, competitor_name, opponent_name)
 );

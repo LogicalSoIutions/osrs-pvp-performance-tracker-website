@@ -7,6 +7,11 @@ import type { FightDetail, FightLogEntry, FightPerformance, FightSummary, Player
 import { WEAPON_IMAGES_BY_ITEM_ID } from "@/src/lib/weapon-images";
 
 const number0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const HIDDEN_RSN = "Hidden";
+
+function isHiddenRsn(name: string) {
+  return name === HIDDEN_RSN;
+}
 const number1 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const number2 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const percent1 = new Intl.NumberFormat("en-US", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -1019,7 +1024,7 @@ function HomeDashboard({
       <section className={styles.pluginGuideCard}>
         <h3>Connect Your RuneLite Plugin</h3>
         <p>
-          Open RuneLite settings, find the <strong>PvP Performance Tracker</strong> plugin and enable the "Upload Fights to PvP-Hub.com" setting to automatically upload your fights! New fights will pin to this board as soon as the fight is over and the tracker overlay in-game goes away.
+          Open RuneLite settings, find the <strong>PvP Performance Tracker</strong> plugin and enable the "Upload Fights to PvP-Hub.com" setting to automatically upload your fights. Public visibility follows your chosen upload delay, so fights can appear a little later after the in-game tracker finishes.
         </p>
       </section>
 
@@ -1205,11 +1210,16 @@ function PlayerDashboard({
               ) : (
                 visibleMatchups.map((rec) => {
                   const h2hWinRate = (rec.wins / rec.total) * 100;
+                  const canOpenOpponent = !isHiddenRsn(rec.opponent);
                   return (
                     <div
                       key={rec.opponent}
                       className={styles.h2hItem}
-                      onClick={() => onPlayerClick(rec.opponent)}
+                      onClick={() => {
+                        if (canOpenOpponent) {
+                          onPlayerClick(rec.opponent);
+                        }
+                      }}
                     >
                       <strong className={styles.h2hOpponent}>{rec.opponent}</strong>
                       <div className={styles.h2hStats}>
@@ -1602,7 +1612,7 @@ export function FightBrowser({
           const lowerSelected = currentSelectedPlayer.toLowerCase();
           if (
             newFight.competitor_name.toLowerCase() === lowerSelected ||
-            newFight.opponent_name.toLowerCase() === lowerSelected
+            (!isHiddenRsn(newFight.opponent_name) && newFight.opponent_name.toLowerCase() === lowerSelected)
           ) {
             void loadPlayerFights(currentSelectedPlayer);
 
@@ -1834,8 +1844,12 @@ export function FightBrowser({
                       </div>
                       <div className={styles.summaryVS}>VS</div>
                       <div
-                        className={`${styles.summaryName} ${styles.summaryNameRight} ${styles.clickablePlayerName} ${selectedFight.full_data.o.x ? styles.summaryDanger : ""}`}
-                        onClick={() => handlePlayerClick(selectedFight.full_data.o.n)}
+                        className={`${styles.summaryName} ${styles.summaryNameRight} ${!isHiddenRsn(selectedFight.full_data.o.n) ? styles.clickablePlayerName : ""} ${selectedFight.full_data.o.x ? styles.summaryDanger : ""}`}
+                        onClick={() => {
+                          if (!isHiddenRsn(selectedFight.full_data.o.n)) {
+                            handlePlayerClick(selectedFight.full_data.o.n);
+                          }
+                        }}
                       >
                         {selectedFight.full_data.o.x ? "☠ " : ""}
                         {selectedFight.full_data.o.n}
