@@ -13,6 +13,7 @@ type LocalItemStat = ItemStats & { slot?: string | null };
 type LocalItemStatsIndex = {
   itemNames: Record<string, string>;
   bySlot: Partial<Record<SlotHint, LocalItemStat[]>>;
+  allEntries: LocalItemStat[];
 };
 
 const EQUIPMENT_SLOT_HINTS: Record<number, SlotHint | undefined> = {
@@ -51,6 +52,21 @@ function normalizeLooseItemName(name: string) {
   return normalizeItemStatName(name).replace(/\s*\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
 }
 
+function cloneResolvedItemStats(
+  itemId: number,
+  rawName: string,
+  resolved: LocalItemStat | ItemStatsRow,
+  current?: ItemStatsRow,
+): ItemStatsRow {
+  return {
+    ...resolved,
+    id: current?.id ?? String(itemId),
+    item_id: itemId,
+    name: rawName,
+    image_url: current?.image_url ?? resolved.image_url,
+  } as ItemStatsRow;
+}
+
 async function loadLocalItemStatsIndex(): Promise<LocalItemStatsIndex> {
   if (!localItemStatsIndexPromise) {
     localItemStatsIndexPromise = (async () => {
@@ -69,7 +85,11 @@ async function loadLocalItemStatsIndex(): Promise<LocalItemStatsIndex> {
         bySlot[slotHint] = entries;
       }
 
-      return { itemNames, bySlot };
+      return {
+        itemNames,
+        bySlot,
+        allEntries: Object.values(bySlot).flat(),
+      };
     })();
   }
 
@@ -114,9 +134,52 @@ async function patchAmbiguousItemStats(
         ?? candidates.find((entry) => normalizeLooseItemName(entry.name) === looseName);
 
       if (resolved) {
-        itemStats[itemId] = resolved as unknown as ItemStatsRow;
+        itemStats[itemId] = cloneResolvedItemStats(itemId, rawName, resolved, current);
         break;
       }
+    }
+  }
+}
+
+async function patchVariantItemStats(
+  itemStats: Record<number, ItemStatsRow>,
+  itemSlotHints: Map<number, Set<SlotHint>>,
+) {
+  const localIndex = await loadLocalItemStatsIndex();
+
+  for (const [itemId, slotHints] of itemSlotHints.entries()) {
+    const current = itemStats[itemId];
+    if (current?.image_url) {
+      continue;
+    }
+
+    const rawName = localIndex.itemNames[String(itemId)];
+    if (!rawName) {
+      continue;
+    }
+
+    const exactName = normalizeItemStatName(rawName);
+    const looseName = normalizeLooseItemName(rawName);
+    const hintedSlots = slotHints.size > 0 ? [...slotHints] : [];
+    const candidateGroups = hintedSlots.length > 0
+      ? hintedSlots.map((slotHint) => localIndex.bySlot[slotHint] ?? [])
+      : [localIndex.allEntries];
+
+    let resolved: LocalItemStat | undefined;
+    for (const candidates of candidateGroups) {
+      resolved =
+        candidates.find((entry) => normalizeItemStatName(entry.name) === exactName)
+        ?? candidates.find((entry) => normalizeLooseItemName(entry.name) === looseName);
+
+      if (resolved?.image_url) {
+        break;
+      }
+
+      resolved = undefined;
+    }
+
+    if (resolved?.image_url) {
+      itemStats[itemId] = cloneResolvedItemStats(itemId, rawName, resolved, current);
     }
   }
 }
@@ -199,6 +262,7 @@ export async function GET(_request: Request, { params }: FightRouteProps) {
 
     const itemStats = await getItemStatsForIds(Array.from(itemIdsSet));
     await patchAmbiguousItemStats(itemStats, itemSlotHints);
+    await patchVariantItemStats(itemStats, itemSlotHints);
 
     return NextResponse.json({
       ...fight,

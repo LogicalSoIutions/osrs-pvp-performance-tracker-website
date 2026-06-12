@@ -1,3 +1,18 @@
+const WEAPON_IMAGE_VARIANTS_BY_ITEM_ID: Record<number, number> = {
+  1263: 1249, // Dragon spear (p)
+  3176: 1249, // Dragon spear (kp)
+  5716: 1249, // Dragon spear (p+)
+  5730: 1249, // Dragon spear (p++)
+  20000: 4587, // Dragon scimitar (or)
+  20406: 4587, // Dragon scimitar (Last Man Standing)
+  20431: 4675, // Ancient staff (Last Man Standing)
+  28031: 4587, // Dragon scimitar (cr)
+  28041: 1249, // Dragon spear (cr)
+  28043: 1249, // Dragon spear (cr)(p)
+  28045: 1249, // Dragon spear (cr)(p+)
+  28047: 1249, // Dragon spear (cr)(p++)
+};
+
 export const WEAPON_IMAGES_BY_ITEM_ID: Record<number, string> = {
   861: "/Magic_shortbow.png", // MAGIC_SHORTBOW
   1215: "/Dragon_dagger.png", // DRAGON_DAGGER
@@ -143,3 +158,30 @@ export const WEAPON_IMAGES_BY_ITEM_ID: Record<number, string> = {
   33184: "/Purging_staff.png", // PURGING_STAFF
   33200: "/Burning_claws.png", // BURNING_CLAWS
 };
+
+export function getWeaponImageByItemId(itemId?: number | null): string | null {
+  if (!itemId || itemId <= 0) {
+    return null;
+  }
+
+  const visited = new Set<number>();
+  let currentId = itemId;
+
+  while (!visited.has(currentId)) {
+    visited.add(currentId);
+
+    const directImage = WEAPON_IMAGES_BY_ITEM_ID[currentId];
+    if (directImage) {
+      return directImage;
+    }
+
+    const canonicalId = WEAPON_IMAGE_VARIANTS_BY_ITEM_ID[currentId];
+    if (!canonicalId) {
+      break;
+    }
+
+    currentId = canonicalId;
+  }
+
+  return null;
+}

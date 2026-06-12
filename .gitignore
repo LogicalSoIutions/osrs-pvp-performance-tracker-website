@@ -43,4 +43,5 @@ next-env.d.ts
 scripts/
 item_stats/
 
-package-lock.json
+package-lock.jsonmap.csv
+map.csv
