@@ -3,8 +3,8 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./fight-browser.module.css";
-import type { FightDetail, FightLogEntry, FightPerformance, FightSummary, PlayerSummary, DashboardStats, PlayerStats } from "@/src/types/fights";
-import { WEAPON_IMAGES_BY_ITEM_ID } from "@/src/lib/weapon-images";
+import type { FightDetail, FightLogEntry, FightPerformance, FightSummary, PlayerSummary, DashboardStats, PlayerStats, ItemStats } from "@/src/types/fights";
+import { getWeaponImageByItemId } from "@/src/lib/weapon-images";
 
 const number0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const HIDDEN_RSN = "Hidden";
@@ -441,15 +441,52 @@ function getWeaponName(src: string): string {
     .join(" ");
 }
 
-function getWeaponIcon(weaponId?: number | null) {
+function normalizeWeaponDisplayName(name?: string | null) {
+  if (!name) {
+    return null;
+  }
+
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed
+    .replace(/#\((unp)\)$/i, "")
+    .replace(/#\(/g, "(")
+    .replace(/#(?:charged|uncharged|regular)$/i, "")
+    .trim();
+}
+
+function getPublicItemImagePathFromName(name?: string | null) {
+  const normalized = normalizeWeaponDisplayName(name);
+  if (!normalized) {
+    return null;
+  }
+
+  return `/${normalized.replace(/\s+/g, "_")}.png`;
+}
+
+function getWeaponIcon(
+  weaponId?: number | null,
+  itemStatsById?: Record<number, ItemStats> | null,
+) {
   if (!weaponId || weaponId <= 0) {
     return null;
   }
-  const src = WEAPON_IMAGES_BY_ITEM_ID[weaponId];
+
+  const stats = itemStatsById?.[weaponId];
+  const normalizedName = normalizeWeaponDisplayName(stats?.name);
+  const src =
+    getPublicItemImagePathFromName(normalizedName)
+    ?? (stats?.image_url
+      ? `/${decodeURIComponent(stats.image_url.split("/").pop()?.split("?")[0] || "")}`
+      : null)
+    ?? getWeaponImageByItemId(weaponId);
   if (!src) {
     return null;
   }
-  const label = getWeaponName(src);
+  const label = normalizedName ?? getWeaponName(src);
   return {
     src,
     alt: label,
@@ -880,6 +917,8 @@ function HomeDashboard({
     return null;
   }
 
+  const visibleRecentFights = stats.recentFights.slice(0, 6);
+
   return (
     <div className={styles.dashboardContainer}>
       {/* Hero Section */}
@@ -911,10 +950,10 @@ function HomeDashboard({
         <div className={styles.dashboardCard}>
           <h2 className={styles.dashboardCardTitle}>Recent PvP Activity</h2>
           <div className={styles.recentFightsList}>
-            {stats.recentFights.length === 0 ? (
+            {visibleRecentFights.length === 0 ? (
               <p className={styles.emptyText}>No recent fights recorded.</p>
             ) : (
-              stats.recentFights.map((fight) => {
+              visibleRecentFights.map((fight) => {
                 const competitorDead = fight.competitor_dead;
                 const opponentDead = fight.opponent_dead;
                 return (
@@ -1903,7 +1942,7 @@ export function FightBrowser({
                             const [style, weaponId] = key.split("|");
                             const normalizedWeaponId = normalizeEquipmentItemId(Number(weaponId));
                             const styleIcon = getAttackStyleIcon(style, normalizedWeaponId);
-                            const weaponIcon = getWeaponIcon(normalizedWeaponId);
+                            const weaponIcon = getWeaponIcon(normalizedWeaponId, selectedFight.item_stats);
                             return (
                               <div className={styles.attackSummaryRow} key={key}>
                                 <span className={styles.attackCount}>{count}x</span>
@@ -1990,7 +2029,7 @@ export function FightBrowser({
                                   />
                                   {(() => {
                                     const weaponId = getWeaponItemId(log.G);
-                                    const weaponIcon = getWeaponIcon(weaponId);
+                                    const weaponIcon = getWeaponIcon(weaponId, selectedFight.item_stats);
                                     return weaponIcon ? (
                                       <span className={styles.tooltipTarget} data-tooltip={weaponIcon.label}>
                                         <Image

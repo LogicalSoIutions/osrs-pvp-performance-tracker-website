@@ -794,7 +794,7 @@ export async function getPlayerStats(playerName: string): Promise<PlayerStats | 
     wins: rec.wins,
     losses: rec.losses,
     total: rec.wins + rec.losses,
-  })).sort((a, b) => b.total - a.total).slice(0, 5);
+  })).sort((a, b) => b.total - a.total);
 
   // Weapons used details
   const weaponIds = Array.from(weaponsCount.keys());
@@ -809,7 +809,7 @@ export async function getPlayerStats(playerName: string): Promise<PlayerStats | 
       src = lastPart ? decodeURIComponent(lastPart.split('?')[0]) : null;
     }
     return { name, count, src };
-  }).sort((a, b) => b.count - a.count).slice(0, 5);
+  }).sort((a, b) => b.count - a.count);
 
   const totalFightsCount = fights.length;
 
