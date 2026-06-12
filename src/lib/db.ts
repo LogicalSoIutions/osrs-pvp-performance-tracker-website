@@ -243,7 +243,7 @@ async function upsertFightUpload(client: Pool | PoolClient, fight: UploadedFight
       public_delay_seconds,
       public_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW() + ($10 * INTERVAL '1 second'))
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::integer, NOW() + ($10::integer * INTERVAL '1 second'))
     ON CONFLICT (fight_id, competitor_name, opponent_name) DO UPDATE
     SET
       last_fight_time = GREATEST(fight_uploads.last_fight_time, EXCLUDED.last_fight_time),
