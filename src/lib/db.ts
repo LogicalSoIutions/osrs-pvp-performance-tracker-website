@@ -161,6 +161,16 @@ function stripUploadOnlyFields(fight: UploadedFightPayload): FightPerformance {
   };
 }
 
+function selectLatestPublicAt(primary: UploadRow, secondary: UploadRow | null): string {
+  if (!secondary) {
+    return primary.public_at;
+  }
+
+  return Date.parse(primary.public_at) >= Date.parse(secondary.public_at)
+    ? primary.public_at
+    : secondary.public_at;
+}
+
 async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayload): Promise<InsertFightResult> {
   await upsertFightUpload(client, fight);
   const uploads = await getFightUploads(client, fight.fightID);
@@ -170,10 +180,7 @@ async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayloa
     collectFightItemIdsForMerge(selected.primary.full_data, selected.secondary?.full_data ?? null),
   );
   const mergedFight = mergeFightPair(selected.primary.full_data, selected.secondary?.full_data ?? null, mergeItemStats);
-  const publicAt = new Date(Math.max(
-    Date.parse(selected.primary.public_at),
-    selected.secondary ? Date.parse(selected.secondary.public_at) : 0,
-  ));
+  const publicAt = selectLatestPublicAt(selected.primary, selected.secondary);
 
   const query = `
     INSERT INTO fights (
@@ -216,7 +223,7 @@ async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayloa
     mergedFight.o.x,
     JSON.stringify(mergedFight),
     selected.secondary ? JSON.stringify(selected.secondary.full_data) : null,
-    publicAt.toISOString(),
+    publicAt,
   ];
 
   const result = await client.query<SummaryRow>(query, values);
