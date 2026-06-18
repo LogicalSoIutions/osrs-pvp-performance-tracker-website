@@ -17,6 +17,8 @@ const SUCCESSFUL_OFFENSIVE_PRAYERS = {
   MAGIC: new Set([134, 503, 505, 1421, 1423]),
 };
 
+const HIDDEN_RSN_PATTERN = /^Hidden-[A-Z0-9]{5}$/;
+
 function cloneFight<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -92,6 +94,23 @@ function filterFullLogs(logs: WrappedLog[]) {
 
 function areOpposingPovs(left: FightPerformance, right: FightPerformance) {
   return left.c.n === right.o.n && left.o.n === right.c.n;
+}
+
+function hasHiddenRsn(fight: FightPerformance) {
+  return HIDDEN_RSN_PATTERN.test(fight.c.n) || HIDDEN_RSN_PATTERN.test(fight.o.n);
+}
+
+function alignHiddenOpposingPov(primary: FightPerformance, secondary: FightPerformance) {
+  if (
+    areOpposingPovs(primary, secondary)
+    || primary.fightID !== secondary.fightID
+    || (!hasHiddenRsn(primary) && !hasHiddenRsn(secondary))
+  ) {
+    return;
+  }
+
+  primary.o.n = secondary.c.n;
+  secondary.o.n = primary.c.n;
 }
 
 function areMatchingAttackLogs(left: WrappedLog, right: WrappedLog) {
@@ -290,6 +309,7 @@ export function mergeFightPair(
   }
 
   const secondaryClone = cloneFight(secondary);
+  alignHiddenOpposingPov(primaryClone, secondaryClone);
   if (!areOpposingPovs(primaryClone, secondaryClone)) {
     return primaryClone;
   }

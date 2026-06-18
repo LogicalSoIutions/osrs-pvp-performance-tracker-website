@@ -10,7 +10,7 @@ const number0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const HIDDEN_RSN = "Hidden";
 
 function isHiddenRsn(name: string) {
-  return name === HIDDEN_RSN;
+  return name === HIDDEN_RSN || /^Hidden-[A-Z0-9]{5}$/.test(name);
 }
 const number1 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const number2 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });

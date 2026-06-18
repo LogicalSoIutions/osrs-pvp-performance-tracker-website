@@ -186,6 +186,20 @@ function stripUploadOnlyFields(fight: UploadedFightPayload): FightPerformance {
   };
 }
 
+function cloneFight<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function alignSecondaryForStorage(secondary: FightPerformance, mergedFight: FightPerformance): FightPerformance {
+  const aligned = cloneFight(secondary);
+  aligned.c.n = mergedFight.o.n;
+  aligned.o.n = mergedFight.c.n;
+  return aligned;
+}
+
+function isHiddenRsn(name: string) {
+  return /^Hidden-[A-Z0-9]{5}$/.test(name);
+}
 
 async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayload): Promise<InsertFightResult> {
   await upsertFightUpload(client, fight);
@@ -196,6 +210,9 @@ async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayloa
     collectFightItemIdsForMerge(selected.primary.full_data, selected.secondary?.full_data ?? null),
   );
   const mergedFight = mergeFightPair(selected.primary.full_data, selected.secondary?.full_data ?? null, mergeItemStats);
+  const secondaryForStorage = selected.secondary
+    ? alignSecondaryForStorage(selected.secondary.full_data, mergedFight)
+    : null;
   const primaryPublicAt = toTimestampWithoutTimezone(selected.primary.public_at);
   const secondaryPublicAt = selected.secondary
     ? toTimestampWithoutTimezone(selected.secondary.public_at)
@@ -251,7 +268,7 @@ async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayloa
     mergedFight.c.x,
     mergedFight.o.x,
     JSON.stringify(mergedFight),
-    selected.secondary ? JSON.stringify(selected.secondary.full_data) : null,
+    secondaryForStorage ? JSON.stringify(secondaryForStorage) : null,
     publicAt,
     secondaryPublicAtFinal,
   ];
@@ -363,7 +380,13 @@ async function selectCanonicalPair(client: Pool | PoolClient, fightId: string, u
       (upload) =>
         upload.competitor_name === primary.opponent_name
         && upload.opponent_name === primary.competitor_name,
-    ) ?? null;
+    ) ??
+    uploads.find(
+      (upload) =>
+        (isHiddenRsn(primary.competitor_name) || isHiddenRsn(upload.competitor_name))
+        && (upload.competitor_name !== primary.competitor_name || upload.opponent_name !== primary.opponent_name),
+    ) ??
+    null;
 
   return { primary, secondary };
 }
