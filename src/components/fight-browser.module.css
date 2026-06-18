@@ -726,6 +726,22 @@
   color: #d8b0a6;
 }
 
+.syncBadgeDelayed {
+  background: rgba(200, 155, 60, 0.08);
+  border-color: rgba(200, 155, 60, 0.3);
+  color: rgba(232, 201, 106, 0.75);
+  animation: delayedPulse 3s ease-in-out infinite;
+}
+
+@keyframes delayedPulse {
+  0%, 100% {
+    border-color: rgba(200, 155, 60, 0.3);
+  }
+  50% {
+    border-color: rgba(232, 201, 106, 0.55);
+  }
+}
+
 .iconLabel,
 .prayerPair,
 .tablePrayerCell {

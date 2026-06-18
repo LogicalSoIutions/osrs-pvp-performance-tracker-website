@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 15650",
     "lint": "eslint",
-    "upload:legacy": "node scripts/upload-legacy-fights.mjs"
+    "upload:legacy": "node scripts/upload-legacy-fights.mjs",
+    "backfill:magic-luck": "node scripts/backfill-magic-luck.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",

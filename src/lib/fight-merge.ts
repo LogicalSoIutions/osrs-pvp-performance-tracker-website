@@ -255,6 +255,8 @@ function mergeFighterFromLogs(
   const magicExpectedHits = recalculatedLogs
     .filter((entry) => isMagicStyle(entry.m))
     .reduce((total, entry) => total + (entry.a ?? 0), 0);
+  const sourceMagicAttacks = Math.max(self.z, mirror?.z ?? 0);
+  const sourceMagicExpectedHits = Math.max(self.M, mirror?.M ?? 0);
   const successfulOffPray = recalculatedLogs.filter((entry) => wasSuccessful(entry)).length;
   const successfulOffensivePrayers = recalculatedLogs.filter((entry) => usedSuccessfulOffensivePrayer(entry)).length;
   return {
@@ -263,9 +265,9 @@ function mergeFighterFromLogs(
     s: recalculatedLogs.length > 0 ? successfulOffPray : Math.max(self.s, mirror?.s ?? 0),
     d: recalculatedLogs.length > 0 ? expectedDamage : Math.max(self.d, mirror?.d ?? 0),
     h: recalculatedLogs.length > 0 ? damageDealt : Math.max(self.h, mirror?.h ?? 0),
-    z: recalculatedLogs.length > 0 ? totalMagicAttacks : Math.max(self.z, mirror?.z ?? 0),
+    z: recalculatedLogs.length > 0 ? Math.max(totalMagicAttacks, sourceMagicAttacks) : sourceMagicAttacks,
     m: Math.max(self.m, mirror?.m ?? 0),
-    M: recalculatedLogs.length > 0 ? magicExpectedHits : Math.max(self.M, mirror?.M ?? 0),
+    M: recalculatedLogs.length > 0 ? Math.max(magicExpectedHits, sourceMagicExpectedHits) : sourceMagicExpectedHits,
     p: recalculatedLogs.length > 0 ? successfulOffensivePrayers : Math.max(self.p, mirror?.p ?? 0),
     g: Math.max(self.g, mirror?.g ?? 0),
     y: Math.max(self.y, mirror?.y ?? 0),

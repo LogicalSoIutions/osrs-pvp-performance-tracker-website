@@ -87,6 +87,7 @@ export type FightSummary = {
   competitor_dead: boolean;
   opponent_dead: boolean;
   has_secondary_pov: boolean;
+  secondary_delayed?: boolean;
   created_at: string;
 };
 

@@ -32,6 +32,7 @@ type SummaryRow = {
   competitor_dead: boolean;
   opponent_dead: boolean;
   has_secondary_pov: boolean;
+  secondary_delayed: boolean;
   is_public?: boolean;
   created_at: string;
 };
@@ -47,8 +48,8 @@ type UploadRow = {
   opponent_dead: boolean;
   full_data: FightPerformance;
   public_delay_seconds: number;
-  public_at: string;
-  created_at: string;
+  public_at: string | Date;
+  created_at: string | Date;
 };
 
 type InsertFightResult = {
@@ -78,6 +79,7 @@ async function ensureSchema() {
       `);
       await pool.query("ALTER TABLE fights ADD COLUMN IF NOT EXISTS secondary_data JSONB NULL");
       await pool.query("ALTER TABLE fights ADD COLUMN IF NOT EXISTS public_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+      await pool.query("ALTER TABLE fights ADD COLUMN IF NOT EXISTS secondary_public_at TIMESTAMP NULL");
       await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_fights_fight_id ON fights (fight_id)");
       await pool.query("CREATE INDEX IF NOT EXISTS idx_fights_competitor ON fights (competitor_name)");
       await pool.query("CREATE INDEX IF NOT EXISTS idx_fights_opponent ON fights (opponent_name)");
@@ -112,29 +114,33 @@ async function ensureSchema() {
 }
 
 function mapSummary(row: SummaryRow): FightSummary {
+  const nameRevealed = row.has_secondary_pov && !row.secondary_delayed;
   return {
     id: row.id,
     fight_id: row.fight_id,
     competitor_name: row.competitor_name,
-    opponent_name: row.has_secondary_pov ? row.opponent_name : HIDDEN_RSN,
+    opponent_name: nameRevealed ? row.opponent_name : HIDDEN_RSN,
     last_fight_time: Number(row.last_fight_time),
     fight_type: row.fight_type,
     world: row.world,
     competitor_dead: row.competitor_dead,
     opponent_dead: row.opponent_dead,
     has_secondary_pov: row.has_secondary_pov,
+    secondary_delayed: row.has_secondary_pov && row.secondary_delayed ? true : undefined,
     created_at: row.created_at,
   };
 }
 
-function sanitizeFightPerformance(fight: FightPerformance, hasSecondaryPov: boolean): FightPerformance {
-  if (hasSecondaryPov) {
+function sanitizeFightPerformance(fight: FightPerformance, hasSecondaryPov: boolean, secondaryDelayed = false): FightPerformance {
+  // When secondary exists and is not delayed, reveal opponent name
+  if (hasSecondaryPov && !secondaryDelayed) {
     return {
       ...fight,
       _secondaryFight: undefined,
     };
   }
 
+  // Hide opponent name when no secondary or when secondary is delayed
   return {
     ...fight,
     o: {
@@ -149,6 +155,25 @@ function getPublicDelaySeconds(fight: UploadedFightPayload): number {
   return Math.max(0, Math.min(18000, Math.trunc(fight.publicDelaySeconds ?? 0)));
 }
 
+function padTimestampPart(value: number, length = 2): string {
+  return value.toString().padStart(length, "0");
+}
+
+function toTimestampWithoutTimezone(value: string | Date): string {
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = padTimestampPart(value.getMonth() + 1);
+    const day = padTimestampPart(value.getDate());
+    const hours = padTimestampPart(value.getHours());
+    const minutes = padTimestampPart(value.getMinutes());
+    const seconds = padTimestampPart(value.getSeconds());
+    const milliseconds = padTimestampPart(value.getMilliseconds(), 3);
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+  }
+
+  return value.replace("T", " ").replace(/Z$/, "");
+}
+
 function stripUploadOnlyFields(fight: UploadedFightPayload): FightPerformance {
   return {
     c: fight.c,
@@ -161,15 +186,6 @@ function stripUploadOnlyFields(fight: UploadedFightPayload): FightPerformance {
   };
 }
 
-function selectLatestPublicAt(primary: UploadRow, secondary: UploadRow | null): string {
-  if (!secondary) {
-    return primary.public_at;
-  }
-
-  return Date.parse(primary.public_at) >= Date.parse(secondary.public_at)
-    ? primary.public_at
-    : secondary.public_at;
-}
 
 async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayload): Promise<InsertFightResult> {
   await upsertFightUpload(client, fight);
@@ -180,7 +196,18 @@ async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayloa
     collectFightItemIdsForMerge(selected.primary.full_data, selected.secondary?.full_data ?? null),
   );
   const mergedFight = mergeFightPair(selected.primary.full_data, selected.secondary?.full_data ?? null, mergeItemStats);
-  const publicAt = selectLatestPublicAt(selected.primary, selected.secondary);
+  const primaryPublicAt = toTimestampWithoutTimezone(selected.primary.public_at);
+  const secondaryPublicAt = selected.secondary
+    ? toTimestampWithoutTimezone(selected.secondary.public_at)
+    : null;
+  // Fight is visible at the earliest upload time (instant user sees it immediately)
+  const publicAt = secondaryPublicAt && secondaryPublicAt < primaryPublicAt
+    ? secondaryPublicAt
+    : primaryPublicAt;
+  // Opponent name is revealed at the latest upload time (delayed user's public_at)
+  const secondaryPublicAtFinal = secondaryPublicAt && secondaryPublicAt > primaryPublicAt
+    ? secondaryPublicAt
+    : (secondaryPublicAt ? primaryPublicAt : null);
 
   const query = `
     INSERT INTO fights (
@@ -194,9 +221,10 @@ async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayloa
       opponent_dead,
       full_data,
       secondary_data,
-      public_at
+      public_at,
+      secondary_public_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     ON CONFLICT (fight_id) DO UPDATE
     SET
       competitor_name = EXCLUDED.competitor_name,
@@ -208,8 +236,9 @@ async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayloa
       opponent_dead = EXCLUDED.opponent_dead,
       full_data = EXCLUDED.full_data,
       secondary_data = EXCLUDED.secondary_data,
-      public_at = EXCLUDED.public_at
-    RETURNING id, fight_id, competitor_name, opponent_name, last_fight_time, fight_type, world, competitor_dead, opponent_dead, secondary_data IS NOT NULL AS has_secondary_pov, public_at <= NOW() AS is_public, created_at
+      public_at = LEAST(fights.public_at, EXCLUDED.public_at),
+      secondary_public_at = EXCLUDED.secondary_public_at
+    RETURNING id, fight_id, competitor_name, opponent_name, last_fight_time, fight_type, world, competitor_dead, opponent_dead, secondary_data IS NOT NULL AS has_secondary_pov, COALESCE(secondary_public_at > NOW(), false) AS secondary_delayed, public_at <= NOW() AS is_public, created_at
   `;
 
   const values = [
@@ -224,6 +253,7 @@ async function upsertFight(client: Pool | PoolClient, fight: UploadedFightPayloa
     JSON.stringify(mergedFight),
     selected.secondary ? JSON.stringify(selected.secondary.full_data) : null,
     publicAt,
+    secondaryPublicAtFinal,
   ];
 
   const result = await client.query<SummaryRow>(query, values);
@@ -374,7 +404,7 @@ export async function getPlayerSummaries(search = ""): Promise<PlayerSummary[]> 
     WITH player_fights AS (
       SELECT competitor_name AS player_name, last_fight_time FROM fights WHERE public_at <= NOW()
       UNION ALL
-      SELECT opponent_name AS player_name, last_fight_time FROM fights WHERE public_at <= NOW() AND secondary_data IS NOT NULL
+      SELECT opponent_name AS player_name, last_fight_time FROM fights WHERE public_at <= NOW() AND secondary_data IS NOT NULL AND COALESCE(secondary_public_at, public_at) <= NOW()
     )
     SELECT
       player_name,
@@ -413,9 +443,13 @@ export async function getPlayerFights(playerName: string): Promise<FightSummary[
       competitor_dead,
       opponent_dead,
       secondary_data IS NOT NULL AS has_secondary_pov,
+      COALESCE(secondary_public_at > NOW(), false) AS secondary_delayed,
       created_at
     FROM fights
-    WHERE public_at <= NOW() AND (competitor_name = $1 OR (secondary_data IS NOT NULL AND opponent_name = $1))
+    WHERE public_at <= NOW() AND (
+      competitor_name = $1
+      OR (secondary_data IS NOT NULL AND opponent_name = $1 AND COALESCE(secondary_public_at, public_at) <= NOW())
+    )
     ORDER BY last_fight_time DESC
   `;
 
@@ -439,6 +473,7 @@ export async function getFightByFightId(fightId: string): Promise<FightDetail | 
       full_data,
       secondary_data,
       secondary_data IS NOT NULL AS has_secondary_pov,
+      COALESCE(secondary_public_at > NOW(), false) AS secondary_delayed,
       created_at
     FROM fights
     WHERE fight_id = $1 AND public_at <= NOW()
@@ -457,10 +492,11 @@ export async function getFightByFightId(fightId: string): Promise<FightDetail | 
     return null;
   }
 
+  const secondaryDelayed = row.has_secondary_pov && row.secondary_delayed;
   return {
     ...mapSummary(row),
-    full_data: sanitizeFightPerformance(row.full_data, row.has_secondary_pov),
-    secondary_data: row.has_secondary_pov && row.secondary_data ? sanitizeFightPerformance(row.secondary_data, true) : null,
+    full_data: sanitizeFightPerformance(row.full_data, row.has_secondary_pov, secondaryDelayed),
+    secondary_data: row.has_secondary_pov && row.secondary_data ? sanitizeFightPerformance(row.secondary_data, true, secondaryDelayed) : null,
   };
 }
 
@@ -538,7 +574,7 @@ export async function getGlobalStats(): Promise<DashboardStats> {
     SELECT COUNT(DISTINCT player_name)::text AS count FROM (
       SELECT competitor_name AS player_name FROM fights WHERE public_at <= NOW()
       UNION ALL
-      SELECT opponent_name AS player_name FROM fights WHERE public_at <= NOW() AND secondary_data IS NOT NULL
+      SELECT opponent_name AS player_name FROM fights WHERE public_at <= NOW() AND secondary_data IS NOT NULL AND COALESCE(secondary_public_at, public_at) <= NOW()
     ) p
   `);
   const totalPlayers = parseInt(playersCountRes.rows[0]?.count || "0", 10);
@@ -560,7 +596,7 @@ export async function getGlobalStats(): Promise<DashboardStats> {
     FROM (
       SELECT competitor_name AS player_name, NOT competitor_dead AS is_winner, last_fight_time FROM fights WHERE public_at <= NOW()
       UNION ALL
-      SELECT opponent_name AS player_name, NOT opponent_dead AS is_winner, last_fight_time FROM fights WHERE public_at <= NOW() AND secondary_data IS NOT NULL
+      SELECT opponent_name AS player_name, NOT opponent_dead AS is_winner, last_fight_time FROM fights WHERE public_at <= NOW() AND secondary_data IS NOT NULL AND COALESCE(secondary_public_at, public_at) <= NOW()
     ) sub
     GROUP BY player_name
     ORDER BY fight_count DESC, player_name ASC
@@ -587,6 +623,7 @@ export async function getGlobalStats(): Promise<DashboardStats> {
       competitor_dead,
       opponent_dead,
       secondary_data IS NOT NULL AS has_secondary_pov,
+      COALESCE(secondary_public_at > NOW(), false) AS secondary_delayed,
       created_at
     FROM fights
     WHERE public_at <= NOW()
@@ -627,7 +664,10 @@ export async function getPlayerStats(playerName: string): Promise<PlayerStats | 
     `
       SELECT full_data, secondary_data
       FROM fights
-      WHERE public_at <= NOW() AND (competitor_name = $1 OR (secondary_data IS NOT NULL AND opponent_name = $1))
+      WHERE public_at <= NOW() AND (
+        competitor_name = $1
+        OR (secondary_data IS NOT NULL AND opponent_name = $1 AND COALESCE(secondary_public_at, public_at) <= NOW())
+      )
       ORDER BY last_fight_time DESC
       LIMIT 50
     `,
@@ -648,7 +688,7 @@ export async function getPlayerStats(playerName: string): Promise<PlayerStats | 
   let totalOffPray = 0;
   let totalOffensivePray = 0;
   let totalOffensivePrayAttacks = 0; // only when POVs are available
-  let totalMagicAttacks = 0;
+  let totalMagicExpectedHits = 0;
   let totalMagicHits = 0;
   let totalDmgDealt = 0;
   let totalExpectedDmg = 0;
@@ -717,8 +757,8 @@ export async function getPlayerStats(playerName: string): Promise<PlayerStats | 
       totalOffensivePrayAttacks += self.a || 0;
     }
 
-    // Magic Luck: self.m / self.M
-    totalMagicAttacks += self.M || 0;
+    // Magic Luck: actual magic hits divided by expected magic hits.
+    totalMagicExpectedHits += self.M || 0;
     totalMagicHits += self.m || 0;
 
     // Damage Dealt & Expected
@@ -830,7 +870,7 @@ export async function getPlayerStats(playerName: string): Promise<PlayerStats | 
     averages: {
       offPrayerRatio: totalAttacks > 0 ? totalOffPray / totalAttacks : 0,
       offensivePrayerRatio: totalOffensivePrayAttacks > 0 ? totalOffensivePray / totalOffensivePrayAttacks : 0,
-      magicLuckRatio: totalMagicAttacks > 0 ? totalMagicHits / totalMagicAttacks : 0,
+      magicLuckRatio: totalMagicExpectedHits > 0 ? totalMagicHits / totalMagicExpectedHits : 0,
       avgDmgDealt: totalFightsCount > 0 ? totalDmgDealt / totalFightsCount : 0,
       avgExpectedDmg: totalFightsCount > 0 ? totalExpectedDmg / totalFightsCount : 0,
       avgHpHealed: totalHpHealedCount > 0 ? totalHpHealed / totalHpHealedCount : 0,

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS fights (
     full_data JSONB NOT NULL,
     secondary_data JSONB NULL,
     public_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    secondary_public_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

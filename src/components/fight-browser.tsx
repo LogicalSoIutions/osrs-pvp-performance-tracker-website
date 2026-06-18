@@ -633,7 +633,15 @@ function formatLogTime(log: FightLogEntry, firstVisibleTick: number) {
   return `${formatElapsedFromTickDelta(tickDelta)} (${tickDelta}t)`;
 }
 
-function SyncStatusBadge({ synced }: { synced: boolean }) {
+function SyncStatusBadge({ synced, delayed }: { synced: boolean; delayed?: boolean }) {
+  if (synced && delayed) {
+    return (
+      <span className={`${styles.syncBadge} ${styles.syncBadgeDelayed}`}>
+        Synced - Opponent POV Delayed
+      </span>
+    );
+  }
+
   return (
     <span className={`${styles.syncBadge} ${synced ? styles.syncBadgeOn : styles.syncBadgeOff}`}>
       {synced ? "Synced" : "One POV"}
@@ -976,7 +984,7 @@ function HomeDashboard({
                       <span>•</span>
                       <span>{fight.fight_type}</span>
                       <span>•</span>
-                      <SyncStatusBadge synced={fight.has_secondary_pov} />
+                      <SyncStatusBadge synced={fight.has_secondary_pov} delayed={fight.secondary_delayed} />
                     </div>
                   </div>
                 );
@@ -1818,7 +1826,7 @@ export function FightBrowser({
                     W{fight.world}{fight.fight_type !== "NORMAL" ? ` • ${fight.fight_type}` : ""} • {fight.fight_id}
                   </div>
                   <div className={styles.cardMeta}>
-                    <SyncStatusBadge synced={fight.has_secondary_pov} />
+                    <SyncStatusBadge synced={fight.has_secondary_pov} delayed={fight.secondary_delayed} />
                   </div>
                 </button>
               );
@@ -1870,7 +1878,7 @@ export function FightBrowser({
                 <div className={styles.panel}>
                   <div className={styles.sectionHeader}>
                     <h2 className={styles.sectionTitle}>Fight Summary</h2>
-                    <SyncStatusBadge synced={selectedFight.has_secondary_pov} />
+                    <SyncStatusBadge synced={selectedFight.has_secondary_pov} delayed={selectedFight.secondary_delayed} />
                   </div>
                   <div className={styles.summaryCardContent}>
                     <div className={styles.summaryNameRow}>
